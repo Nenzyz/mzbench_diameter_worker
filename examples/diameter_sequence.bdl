@@ -1,0 +1,8 @@
+#!benchDL
+include_resource(ccr_session, "ccr_sequence.erl", erlang)
+pool(size = 1,
+     worker_type = diameter_worker):
+    connect(address = "127.0.0.1", port=3868, auth_application_id = "4",
+            dictionary="diameter_3gpp_ro", avp_dictionaries="diameter_ericsson")
+    call(resource(ccr_session))
+    disconnect()

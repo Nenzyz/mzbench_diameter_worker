@@ -1,12 +1,13 @@
 -module(diameter_worker).
 
--export([initial_state/0, metrics/0, connect/3, disconnect/2, call/4]).
+-export([initial_state/0, metrics/0, connect/3, disconnect/2, call/3, call/4]).
 
 -include_lib("diameter/include/diameter.hrl").
 
 -record(st, {service :: atom(),
              service_name :: string(),
-             application :: atom()
+             application :: atom(),
+             required_avps :: map()
             }).
 
 -type meta() :: [{Key :: atom(), Value :: any()}].
@@ -72,7 +73,7 @@ metrics(St=#st{service_name = SN}) ->
 %%   must implement `diameter_app' behavior
 %%   you have to define this modules as resources with module names
 %% - origin_host :: default to `inet:gethostname()'
-%% - origin_realm :: default to "testdomain-client.com"
+%% - origin_realm :: default to "mzbench-client.com"
 %% - product_name :: default to "MzBench"
 %% - auth_application_id :: comma separated list of integers, default to empty string
 %% - acct_application_id :: comma separated list of integers, default to empty string
@@ -92,16 +93,18 @@ metrics(St=#st{service_name = SN}) ->
 %% @end
 -spec connect(#st{}, meta(), [connect_opt()]) -> {nil, #st{}}.
 connect(_State, _Meta, Param) ->
+    {ok, _} = application:ensure_all_started(diameter),
     {ok, Hostname} = inet:gethostname(),
     DictMod = to_atom(proplists:get_value(dictionary, Param)),
     check_module(DictMod, [{vendor_id, 0}, {dict, 0}]),
-    CbMod = to_atom(proplists:get_value(module, Param, diameter_wroker_client_cb)),
+    CbMod = to_atom(proplists:get_value(module, Param, diameter_worker_cb)),
     check_module(CbMod, [{peer_up,3}, {peer_down,3}, {pick_peer,4}, {prepare_request,3},
                          {prepare_retransmit,3}, {handle_answer,4}, {handle_error,4},
                          {handle_request,3}]),
-
-    SvcOpts = [{'Origin-Host', proplists:get_value(origin_host, Param, Hostname)},
-               {'Origin-Realm', proplists:get_value(origin_realm, Param, "testdomain-client.com")},
+    OriginHost = proplists:get_value(origin_host, Param, Hostname),
+    OriginRealm = proplists:get_value(origin_realm, Param, "mzbench-client.com"),
+    SvcOpts = [{'Origin-Host', OriginHost},
+               {'Origin-Realm', OriginRealm},
                {'Vendor-Id', DictMod:vendor_id()},
                {'Product-Name', proplists:get_value(product_name, Param, "MzBench")},
                {'Auth-Application-Id', int_list(proplists:get_value(auth_application_id, Param, ""))},
@@ -131,29 +134,50 @@ connect(_State, _Meta, Param) ->
     ok = diameter:start_service(SvcName, SvcOpts),
     true = diameter:subscribe(SvcName),
     {ok, _Ref} = diameter:add_transport(SvcName, {connect, TrOpts}),
-    receive
-        #diameter_event{service = SvcName, info = Info}
-          when element(1, Info) == up ->
-            diameter:unsubscribe(SvcName),
-            ok;
-        _ ->
-            diameter:unsubscribe(SvcName),
-            error(diameter_client_not_started)
-    end,
-    mzb_metrics:declare_metrics(metrics(SvcNameStr)),
-    {nil, #st{service = SvcName,  service_name = SvcNameStr, application = DictMod}}.
+    #diameter_caps{origin_host = {OH, _DH}, origin_realm = {OR, DR}} =
+        receive
+            #diameter_event{service = SvcName, info = {up, _Ref, {_, Caps}, _C}} ->
+                diameter:unsubscribe(SvcName),
+                Caps;
+            #diameter_event{service = SvcName, info = {up, _Ref, {_, Caps}, _C, _P}} ->
+                diameter:unsubscribe(SvcName),
+                Caps;
+            _ ->
+                diameter:unsubscribe(SvcName),
+                error(diameter_client_not_started)
+        end,
+    St = #st{service = SvcName,  service_name = SvcNameStr, application = DictMod,
+             required_avps = #{'Session-Id' => diameter:session_id(OriginHost),
+                               'Origin-State-Id' => [diameter:origin_state_id()],
+                               'Origin-Host' => OH,
+                               'Origin-Realm' => OR,
+                               'Destination-Realm' => DR
+                              }
+            },
+    mzb_metrics:declare_metrics(metrics(St)),
+    {nil, St}.
 
 -spec disconnect(#st{}, meta()) -> {nil, #st{}}.
 disconnect(St=#st{service = SvcName}, _Meta) ->
     diameter:stop_service(SvcName),
     {nil, St}.
 
--spec call(#st{}, meta(), string(), map()) -> {nil, #st{}}.
-call(St=#st{service = SvcName, application = AppName}, _Meta, MsgName, Msg) ->
+call(InitSt, Meta, Msgs) when is_list(Msgs) ->
+    lists:mapfoldl(fun (#{message_name := MsgName, message := Msg}, St) ->
+                           call(St, Meta, MsgName, Msg)
+                   end, InitSt, Msgs).
+
+-spec call(#st{}, meta(), string(), map()) -> {any(), #st{}}.
+call(St=#st{service = SvcName, application = AppName, required_avps = ReqAvps}, _Meta, MsgName, Msg) ->
     Now = erlang:monotonic_time(microsecond),
-    case diameter:call(SvcName, AppName, [to_atom(MsgName)|resmap_to_msg(Msg)], []) of
-        {ok, [_MsgName|Msg]} ->
+    Msg1 = maps:merge(ReqAvps, resmap_to_msg(Msg)),
+    Req = [to_atom(MsgName)|Msg1],
+    Res = diameter:call(SvcName, AppName, Req, []),
+    case Res of
+        {ok, [_MsgName|_]} ->
             mzb_metrics:notify({metric_name(St, "success"), counter}, 1);
+        {error, encode} ->
+            error({encode, Req});
         {error, timeout} ->
             mzb_metrics:notify({metric_name(St, "errors"), counter}, 1);
         {error, _} ->
@@ -161,7 +185,7 @@ call(St=#st{service = SvcName, application = AppName}, _Meta, MsgName, Msg) ->
     end,
     Duration = erlang:monotonic_time(microsecond) - Now,
     mzb_metrics:notify({metric_name(St, "latency"), histogram}, Duration),
-    {nil, St}.
+    {Res, St}.
 
 %%==============================================================================
 %% Utility functions
@@ -200,7 +224,7 @@ load_module_(Mod) ->
     end.
 
 check_module_exports(Mod, Funs) ->
-    Exports = module:module_info(exports),
+    Exports = Mod:module_info(exports),
     case Funs -- Exports of
         [] -> ok;
         Undef ->
@@ -211,7 +235,7 @@ metric_name(#st{service_name = SN}, MN) ->
     SN ++ "." ++ MN.
 
 comma_list(Str) ->
-    string:split(Str, ",").
+    [V || V <- string:split(Str, ","), V /= ""].
 
 atom_list(Str) ->
     lists:map(fun to_atom/1, comma_list(Str)).
