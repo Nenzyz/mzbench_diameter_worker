@@ -1,0 +1,78 @@
+@name   diameter_ericsson
+@prefix es
+@vendor 193 Ericsson
+@inherits diameter_gen_base_rfc6733
+@inherits diameter_3gpp_base
+@inherits diameter_gen_ietf
+
+
+@avp_types
+   ES-PDP-Context-Type              321  Enumerated  V
+   Rule-Space-Decision           291  UTF8String  V
+   Rule-Space-Suggestion         290  UTF8String  V
+   URL-Modifier                  332  Enumerated  V
+   Active-Time-Report            323  Grouped     V
+   Active-Time-Report-Start-Time 324  Time        V
+   Active-Time-Report-End-Time   325  Time        V
+   Active-Time-Reporting         322  Enumerated  V
+   Credit-Instance-Id            1143 OctetString V
+   Cumulative-Used-Service-Unit  1145 Grouped     V
+   Service-Start-Timestamp       1144 Time        V
+   Time-Quota-Measurement        326  Grouped     V
+   Time-Quota-Method             327  Enumerated  V
+   Time-Quota-Resolution         328  Unsigned32  V
+   Time-Quota-Inactivity-Time    329  Unsigned32  V
+   User-Redirected               330  Grouped     V
+   User-Agent                    331  UTF8String  V
+   PS-Previous-Information       1140 Grouped     V
+
+@grouped
+   Time-Quota-Measurement ::= <AVP Header: 326>
+      {Time-Quota-Method}
+      {Time-Quota-Resolution}
+      [Time-Quota-Inactivity-Time]
+
+   Active-Time-Report ::= <AVP Header: 323>
+     {Active-Time-Report-Start-Time}
+     [Active-Time-Report-End-Time]
+     [CC-Total-Octets]
+     [CC-Input-Octets]
+     [CC-Output-Octets]
+
+   User-Redirected ::= <AVP Header: 330>
+     [User-Agent]
+
+   PS-Previous-Information ::= <AVP Header: 1140>
+     [3GPP-GPRS-Negotiated-QoS-Profile]
+     [SGSN-Address]
+     [3GPP-SGSN-MCC-MNC]
+     [3GPP-MS-TimeZone]
+     [3GPP-User-Location-Info]
+     [3GPP-RAT-Type]
+
+   Cumulative-Used-Service-Unit ::= <AVP Header: 1145>
+     [CC-Input-Octets]
+     [CC-Output-Octets]
+     [CC-Service-Specific-Units]
+     [CC-Time]
+     [CC-Total-Octets]
+
+@enum ES-PDP-Context-Type
+  PRIMARY   0
+  SECONDARY 1
+
+@enum Time-Quota-Method
+  DURATION            1
+  INACTIVITY_INCLUDED 2
+  INACTIVITY          3
+  ACTIVE_PERIODS      4
+
+@enum Active-Time-Reporting
+  NO_REPORTING             0
+  REPORT_TIMESTAMP         1
+  REPORT_TIME_STAMP_VOLUME 2
+
+@enum URL-Modifier
+  APPEND_URL 1
+
+@end
