@@ -71,7 +71,6 @@ metrics(St=#st{service_name = SN}) ->
 %% - dictionary :: diameter dictionary module name
 %% - module :: callback module default to `diameter_worker_cb'
 %%   must implement `diameter_app' behavior
-%%   you have to define this modules as resources with module names
 %% - origin_host :: default to `inet:gethostname()'
 %% - origin_realm :: default to "mzbench-client.com"
 %% - product_name :: default to "MzBench"
