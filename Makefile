@@ -16,8 +16,8 @@ generate_tgz: compile
 	rm -rf pkgroot/${PKG_NAME}/deps/${PKG_NAME}
 	if [ -d "examples" ]; then cp -Rf examples pkgroot/${PKG_NAME}; fi
 	if [ -d "resources" ]; then cp -Rf resources pkgroot/${PKG_NAME}; fi
+	if [ -d "dia" ]; then cp -Rf resources pkgroot/${PKG_NAME}; fi
 	if [ -f "sys.config" ]; then cp sys.config pkgroot/${PKG_NAME}/; fi
-	
 	cd pkgroot && tar czf ../${PKG_NAME}.tgz ./${PKG_NAME} && cd ..
 	rm -rf pkgroot
 
