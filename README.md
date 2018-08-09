@@ -7,7 +7,43 @@ For now it is suitable for simple request/answer scenarios.
 
 ## Configuration
 
-At first you need diameter dictionaries for your diameter applications
+### MzBench
+
+Erlang release in `MzBench` doesn't include `diameter` application. You have to add it.
+
+Edit `node/rebar.config`, find `relx` configuration part add
+`,{diameter, load}` after `inets`:
+
+```
+{relx, [
+    {release, {mzbench, "0.5.5"},
+        [mzbench, dummy_worker, mz_histogram, mz_counter,
+        crypto, public_key, asn1, ssl, inets]},
+
+```
+
+will be:
+
+```
+{relx, [
+    {release, {mzbench, "0.5.5"},
+        [mzbench, dummy_worker, mz_histogram, mz_counter,
+        crypto, public_key, asn1, ssl, inets, {diameter, load}]},
+
+```
+
+Reinstall node code:
+
+```
+cd node
+make clean
+make local_tgz
+make install
+```
+
+### Dictionaries
+
+You need diameter dictionaries for your diameter applications
 in [OTP Diameter Dictionary Format](http://erlang.org/doc/man/diameter_dict.html).
 
 Place them in [dia](dia) subdirectory.
