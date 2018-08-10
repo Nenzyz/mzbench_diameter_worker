@@ -3,7 +3,7 @@
 This is diameter worker for [MzBench](https://github.com/satori-com/mzbench)
 
 For now it is suitable for simple request/answer scenarios. 
-`SCTP` transport is not tested yet.
+It support both, `TCP` and `SCTP` transports.
 
 ## Configuration
 
