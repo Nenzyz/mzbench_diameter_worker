@@ -74,7 +74,7 @@ alternatively.
 Lists of messages are represented as lists of maps:
 
 ``` erlang
-[#{message_name => string(), message => map()]
+[#{message_name => string(), message => map()}]
 ```
 
 # Usage
