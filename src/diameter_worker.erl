@@ -121,7 +121,7 @@ connect(_State, _Meta, Param) ->
     Address = proplists:get_value(address, Param, "127.0.0.1"),
     Port = proplists:get_value(port, Param, 3868),
     AvpDicts = atom_list(proplists:get_value(avp_dictionaries, Param, [])),
-    TrMod = transport_module(proplists:get_value(transport, Param, tcp)),
+    TrMod = transport_module(to_atom(proplists:get_value(transport, Param, tcp))),
     TrOpts = [{connect_timer, 30000}, {transport_module, TrMod},
               {avp_dictionaries, AvpDicts},
               {transport_config, maps:to_list(#{raddr => Address,
