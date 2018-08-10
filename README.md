@@ -3,7 +3,7 @@
 This is diameter worker for [MzBench](https://github.com/satori-com/mzbench)
 
 For now it is suitable for simple request/answer scenarios. 
-It support both, `TCP` and `SCTP` transports.
+It supports both, `TCP` and `SCTP` transports.
 
 ## Configuration
 
@@ -47,6 +47,8 @@ You need diameter dictionaries for your diameter applications
 in [OTP Diameter Dictionary Format](http://erlang.org/doc/man/diameter_dict.html).
 
 Place them in [dia](dia) subdirectory.
+
+### Worker
 
 Worker accepts the following parameters:
 
